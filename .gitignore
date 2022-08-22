@@ -34,4 +34,6 @@ html
 latex
 *.db
 
-
+dist
+build
+*.egg-info
