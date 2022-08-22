@@ -59,7 +59,8 @@ setup(
     ],
     python_requires='>=3.7',
     install_requires=[
-        'pyserial'
+        'pyserial',
+        'gcode_machine'
     ],
     extras_require={
     },
