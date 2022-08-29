@@ -902,6 +902,8 @@ class Gerbil:
         while self._iface_read_do == True:
             line = self._queue.get()
             
+            self._logger.debug(line)
+            
             if len(line) > 0:
                 if line[0] == "<":
                     self._update_state(line)
