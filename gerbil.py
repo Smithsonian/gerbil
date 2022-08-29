@@ -963,7 +963,7 @@ class Gerbil:
                     self.gcode_parser_state_requested = True
                         
                 else:
-                    m = re.match("\$(.*)=(.*) \((.*)\)", line)
+                    m = re.match("\$(\S*)=(\S*)\ ?(\(.*\))?", line)
                     if m:
                         key = int(m.group(1))
                         val = m.group(2)
