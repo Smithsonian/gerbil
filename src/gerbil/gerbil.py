@@ -144,7 +144,7 @@ class Gerbil:
     
     __version__ = "0.5.0"
     
-    def __init__(self, callback, name="mygrbl"):
+    def __init__(self, callback=None, name="mygrbl", debug=False):
         """Straightforward initialization tasks.
         
         @param callback
@@ -163,7 +163,7 @@ class Gerbil:
         several instances to control several CNC machines at once.
         It is only used for logging output and UI messages.
         """
-        
+            
         ## @var name
         # Set an informal name of the instance. Useful if you are
         # running several instances to control several CNC machines at
@@ -254,16 +254,18 @@ class Gerbil:
         # the requested data. After the callback, this variable reverts
         # to `False`.
         self.hash_state_requested = False
-        
-        
-        
+    
         ## @var logger
         # The logger used by this class. The default is Python's own
         # logger module. Use `setup_logging()` to attach custom
         # log handlers.
         self.logger = logging.getLogger("gerbil")
-        self.logger.setLevel(5)
-        self.logger.propagate = False
+        if debug:
+            self.logger.setLevel(logging.DEBUG)
+            self.logger.propagate = True
+        else:
+            self.logger.setLevel(logging.INFO)
+            self.logger.propagate = False
         
         ## @var target
         # Set this to change the output target. Default is "firmware"
@@ -347,7 +349,10 @@ class Gerbil:
         
         self._counter = 0 # general-purpose counter for timing tasks inside of _poll_state
         
-        self._callback = callback
+        if callback:
+            self._callback = callback
+        else:
+            self._callback = self._default_callback
         
         atexit.register(self.disconnect)
         
@@ -598,6 +603,7 @@ class Gerbil:
         be \n terminated.
         """
         bytes_in_firmware_buffer = sum(self._rx_buffer_fill)
+        self.logger.debug(f"send_immediately line: {line}")
         if bytes_in_firmware_buffer > 0:
             self.logger.error("Firmware buffer has {:d} unprocessed bytes in it. Will not send {}".format(bytes_in_firmware_buffer, line))
             return
@@ -614,7 +620,14 @@ class Gerbil:
             # The PRB response is sent for $# as well as when probing.
             # Regular querying of the hash state needs to be done like this,
             # otherwise the PRB response would be interpreted as a probe answer.
+            self.logger.debug("setting hash_state_requested True")
             self.hash_state_requested = True
+            return
+        
+        if "$G" in line:
+            # A gcode parser state has been requested
+            self.logger.debug("setting gcode_parser_state_requested True")
+            self.gcode_parser_state_requested = True
             return
         
         self.preprocessor.set_line(line)
@@ -904,22 +917,29 @@ class Gerbil:
             
             if len(line) > 0:
                 if line[0] == "<":
+                    #self.logger.debug(f"Received state line: {line}")
                     self._update_state(line)
                     
                 elif line == "ok":
                     self._handle_ok()
                     
-                elif re.match("^\[G[0123] .*", line):
+                elif re.match("^\[GC:G[0123] .*", line):
+                    self.logger.debug(f"Received gcode parser state line: {line}")
+                    
                     self._update_gcode_parser_state(line)
-                    self._callback("on_read", line)
+                    self.gcode_parser_state_requested = False
+                    self._callback("on_read_gps", line)
                 
                 elif line == "[MSG:Caution: Unlocked]":
                     # nothing to do here
+                    self.logger.debug(f"Received line: {line}")
                     pass
                 
                 elif re.match("^\[...:.*", line):
+                    self.logger.debug(f"Received hash state line: {line}")
                     self._update_hash_state(line)
-                    self._callback("on_read", line)
+                    self._hash_state_sent = False
+                    self._callback("on_read_hash_state", line)
                         
                     if "PRB" in line:
                         # last line
@@ -934,15 +954,17 @@ class Gerbil:
                         
                     
                 elif "ALARM" in line:
+                    self.logger.debug(f"Received ALARM: {line}")
+                    
                     self.cmode = "Alarm" # grbl for some reason doesn't respond to ? polling when alarm due to soft limits
                     self._callback("on_stateupdate", self.cmode, self.cmpos, self.cwpos)
-                    self._callback("on_read", line)
+                    self._callback("on_read_state", line)
                     self._callback("on_alarm", line)
                     
                 elif "error" in line:
-                    #self.logger.debug("ERROR")
+                    self.logger.debug("ERROR")
                     self._error = True
-                    #self.logger.debug("%s: _rx_buffer_backlog at time of error: %s", self.name,  self._rx_buffer_backlog)
+                    self.logger.debug("%s: _rx_buffer_backlog at time of error: %s", self.name,  self._rx_buffer_backlog)
                     if len(self._rx_buffer_backlog) > 0:
                         problem_command = self._rx_buffer_backlog[0]
                         problem_line = self._rx_buffer_backlog_line_number[0]
@@ -954,14 +976,16 @@ class Gerbil:
                     self._set_streaming_src_end_reached(True)
                     
                 elif "Grbl " in line:
-                    self._callback("on_read", line)
+                    self.logger.debug(f"Received GRBL line: {line}")
+                    
+                    self._callback("on_read_grbl", line)
                     self._on_bootup()
                     self.hash_state_requested = True
                     self.request_settings()
                     self.gcode_parser_state_requested = True
                         
                 else:
-                    m = re.match("\$(.*)=(.*) \((.*)\)", line)
+                    m = re.match("\$(\S*)=(\S*)\ ?(\(.*\))?", line)
                     if m:
                         key = int(m.group(1))
                         val = m.group(2)
@@ -970,11 +994,11 @@ class Gerbil:
                             "val" : val,
                             "cmt" : comment
                             }
-                        self._callback("on_read", line)
+                        self._callback("on_read_settings", line)
                         if key == self._last_setting_number:
                             self._callback("on_settings_downloaded", self.settings)
                     else:
-                        self._callback("on_read", line)
+                        self._callback("on_read_unrecognized", line)
                         #self.logger.info("{}: Could not parse settings: {}".format(self.name, line))
 
     def _handle_ok(self):
@@ -1002,25 +1026,57 @@ class Gerbil:
         self.settings_hash[key] = tpl
         
     def _update_gcode_parser_state(self, line):
-        m = re.match("\[G(\d) G(\d\d) G(\d\d) G(\d\d) G(\d\d) G(\d\d) M(\d) M(\d) M(\d) T(\d) F([\d.-]*?) S([\d.-]*?)\]", line)
+        m = re.match("(G[0-3]|G38.[2-5]|G80)\s", line)
         if m:
-            self.gps[0] = m.group(1) # motionmode
-            self.gps[1] = m.group(2) # current coordinate system
-            self.gps[2] = m.group(3) # plane
-            self.gps[3] = m.group(4) # units
-            self.gps[4] = m.group(5) # dist
-            self.gps[5] = m.group(6) # feed rate mode
-            self.gps[6] = m.group(7) # program mode
-            self.gps[7] = m.group(8) # spindle state
-            self.gps[8] = m.group(9) # coolant state
-            self.gps[9] = m.group(10) # tool number
-            self.gps[10] = m.group(11) # current feed
-            self.gps[11] = m.group(12) # current rpm
-            self._callback("on_gcode_parser_stateupdate", self.gps)
+            self.gps[0] = m.group(1)[1:] # motionmode
             
-            self.update_preprocessor_position()
-        else:
-            self.logger.error("{}: Could not parse gcode parser report: '{}'".format(self.name, line))
+        m = re.match("(G5[4-9])", line)
+        if m:    
+            self.gps[1] = m.group(1)[1:] # current coordinate system
+        
+        m = re.match("(G1[7-9])", line)
+        if m:    
+            self.gps[2] = m.group(1)[1:] # plane
+        
+        m = re.match("(G2[0-1])", line)
+        if m:    
+            self.gps[3] = m.group(1)[1:] # units
+        
+        m = re.match("(G9[0-1])", line)
+        if m:    
+            self.gps[4] = m.group(1)[1:] # dist
+        
+        m = re.match("(G9[3-4])", line)
+        if m:    
+            self.gps[5] = m.group(1)[1:] # feed rate mode
+        
+        m = re.match("(M[0-2]|M30)", line)
+        if m:    
+            self.gps[6] = m.group(1)[1:] # program mode
+        
+        m = re.match("(M[3-5])\s", line)
+        if m:    
+            self.gps[7] = m.group(1)[1:] # spindle state
+        
+        m = re.match("(M[7-9])", line)
+        if m:    
+            self.gps[8] = m.group(1)[1:] # coolant state
+        
+        m = re.match("(T\d*)", line)
+        if m:    
+            self.gps[9] = m.group(1)[1:] # tool number
+        
+        m = re.match("(F[\d|.]*)", line)
+        if m:    
+            self.gps[10] = m.group(1)[1:] # current feed
+            
+        m = re.match("(S[\d|.]*)", line)
+        if m:    
+            self.gps[11] = m.group(1)[1:] # current rpm
+        
+        self._callback("on_gcode_parser_stateupdate", self.gps)
+            
+        self.update_preprocessor_position()
         
     def _update_state(self, line):
         m = re.match("<(.*?),MPos:(.*?),WPos:(.*?)>", line)
@@ -1142,11 +1198,12 @@ class Gerbil:
             self._counter += 1
             
             if self.hash_state_requested:
-                self.get_hash_state()
+                self.logger.debug("_poll_state: Hash state requested")
+                self._get_hash_state()
                 
             elif self.gcode_parser_state_requested:
-                self.get_gcode_parser_state()
-                self.gcode_parser_state_requested = False
+                self.logger.debug("_poll_state: GCode parser state requested")
+                self._get_gcode_parser_state()
             
             else:
                 self._get_state()
@@ -1158,18 +1215,26 @@ class Gerbil:
     def _get_state(self):
         self._iface.write("?")
 
+    def _get_gcode_parser_state(self):
+        self._iface.write("$G\n")
+        self._gps_query_sent = True
+        
     def get_gcode_parser_state(self):
-        self._iface_write("$G\n")
+        self.send_immediately("$G")
 
-    def get_hash_state(self):
+    def _get_hash_state(self):
         if self.cmode == "Hold":
             self.hash_state_requested = False
             self.logger.info("{}: $# command not supported in Hold mode.".format(self.name))
             return
         
         if self._hash_state_sent == False:
-            self._iface_write("$#\n")
+            self.logger.debug("_get_hash_state(): Requesting hash state")
+            self._iface.write("$#\n")
             self._hash_state_sent = True
+            
+    def get_hash_state(self):
+        self.send_immediately("$#")
 
     def _set_streaming_src_end_reached(self, a):
         self._streaming_src_end_reached = a
@@ -1182,5 +1247,12 @@ class Gerbil:
         if a == True:
             self._callback("on_job_completed")
 
-    def _default_callback(self, status, *args):
-        print("GERBIL DEFAULT CALLBACK", status, args)
+    def _default_callback(self, eventstring, *data): 
+        """A dull callback that only prints alarms"""
+        args = [] 
+        for d in data: 
+            args.append(str(d)) 
+        
+        if eventstring == "on_alarm":
+            print("{} {}".format(eventstring.ljust(30), ", ".join(args))) 
+        
