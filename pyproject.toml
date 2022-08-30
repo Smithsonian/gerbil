@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# All the following settings are optional:
+where = ["src"]  # ["."] by default
+include = ["gerbil*"]  # ["*"] by default
+exclude = ["tests*"]  # empty by default
+namespaces = false  # true by default
+
+[project]
+name = "gerbil"
+version = 0.2
+description = "Gerbil -- Universal grbl interface module for Python3."
+author-email = [ 
+        {name='Paul Grimes', email='pgrimes@cfa.harvard.edu'},
+       {name='Michael Franzl', email='michael@franzl.name'} 
+    ]
+readme = "README.rst"
+license = {text = "MIT License"}
+requires-python = ">=3.7"
+dependencies = [
+        'pyserial',
+        'gcode_machine @ git+https://github.com/Smithsonian/gcode_machine.git@package'
+    ]
+classifiers=[
+        # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
+        'License :: OSI Approved :: MIT License',
+        'Operating System :: Unix',
+        'Operating System :: POSIX',
+        'Operating System :: Microsoft :: Windows',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Topic :: Utilities',
+        'Private :: Do Not Upload',
+    ]
+
+[project.urls]
+"Source" = "https://github.com/Smithsonian/gerbil"
+"Issue Tracker" = "https://github.com/Smithsonian/gerbil/issues"
