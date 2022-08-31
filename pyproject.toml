@@ -14,8 +14,8 @@ name = "gerbil"
 version = "0.2.0"
 description = "Gerbil -- Universal grbl interface module for Python3."
 authors = [ 
-        {name='Paul Grimes', email='pgrimes@cfa.harvard.edu'},
-       {name='Michael Franzl', email='michael@franzl.name'} 
+        {name='Michael Franzl', email='michael@franzl.name'},
+        {name='Paul Grimes', email='pgrimes@cfa.harvard.edu'}
     ]
 readme = "README.rst"
 license = {text = "MIT License"}
