@@ -11,9 +11,9 @@ namespaces = false  # true by default
 
 [project]
 name = "gerbil"
-version = 0.2
+version = "0.2.0"
 description = "Gerbil -- Universal grbl interface module for Python3."
-author-email = [ 
+authors = [ 
         {name='Paul Grimes', email='pgrimes@cfa.harvard.edu'},
        {name='Michael Franzl', email='michael@franzl.name'} 
     ]
