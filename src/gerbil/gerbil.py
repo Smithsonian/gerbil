@@ -935,6 +935,9 @@ class Gerbil:
                     self.logger.debug(f"Received line: {line}")
                     pass
                 
+                elif "'$H'|'$X'" in line:
+                    pass
+                
                 elif re.match("^\[...:.*", line):
                     self.logger.debug(f"Received hash state line: {line}")
                     self._update_hash_state(line)
