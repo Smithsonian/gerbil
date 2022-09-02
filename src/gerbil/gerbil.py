@@ -173,7 +173,7 @@ class Gerbil:
         ## @var cmode
         # Get Grbl's current mode.
         # Will be strings 'Idle', 'Check', 'Run'
-        self.cmode = None 
+        self._cmode = None 
         
         ## @var cmpos
         # Get a 3-tuple containing the current coordinates relative
@@ -362,6 +362,17 @@ class Gerbil:
         self.preprocessor.cs_offsets = self.settings_hash
         self._callback("on_gcode_parser_stateupdate", self.gps)
 
+    @property
+    def cmode(self):
+        """Return the current mode"""
+        return self._cmode
+    
+    @cmode.setter
+    def cmode(self, cmode):
+        """Change the state. Emit a debug message if the state is changed"""
+        if cmode != self._cmode:
+            self.logger.debug(f"GRBL state changed to {cmode}")
+        self._cmode = cmode
     
     def setup_logging(self, handler=None):
         """Assign a custom log handler.
