@@ -1214,10 +1214,12 @@ class Gerbil:
             if self.hash_state_requested:
                 self.logger.debug("_poll_state: Hash state requested")
                 self._get_hash_state()
+                self._get_state()
                 
             elif self.gcode_parser_state_requested:
                 self.logger.debug("_poll_state: GCode parser state requested")
                 self._get_gcode_parser_state()
+                self._get_state()
             
             else:
                 self._get_state()
