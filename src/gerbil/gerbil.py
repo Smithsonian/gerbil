@@ -1232,7 +1232,7 @@ class Gerbil:
         self.gcode_parser_state_requested = False
         
     def get_gcode_parser_state(self):
-        self.send_immediately("$G")
+        self.gcode_parser_state_requested = True
 
     def _get_hash_state(self):
         if self.cmode == "Hold":
@@ -1248,7 +1248,7 @@ class Gerbil:
         self.hash_state_requested = False
             
     def get_hash_state(self):
-        self.send_immediately("$#")
+        self.hash_state_requested = True
 
     def _set_streaming_src_end_reached(self, a):
         self._streaming_src_end_reached = a
