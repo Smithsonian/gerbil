@@ -953,22 +953,15 @@ class Gerbil:
                     self.logger.debug(f"Received hash state line: {line}")
                     self._update_hash_state(line)
                     self._callback("on_read_hash_state", line)
-                        
                     if "PRB" in line:
-                        # last line
-                        if self.hash_state_requested == True:
+                        # last line of hash state dump
+                        if self._hash_state_sent == True:
                             self._hash_state_sent = False
-                            self.hash_state_requested = False
                             self._callback("on_hash_stateupdate", self.settings_hash)
                             self.preprocessor.cs_offsets = self.settings_hash
                         else:
                             self._callback("on_probe", self.settings_hash["PRB"])
-                    
-                    self._hash_state_sent = False
-                    self.hash_state_requested = False
-                       
                         
-                    
                 elif "ALARM" in line:
                     self.logger.debug(f"Received ALARM: {line}")
                     
@@ -1250,6 +1243,7 @@ class Gerbil:
             self.logger.debug("_get_hash_state(): Requesting hash state")
             self._iface.write("$#\n")
             self._hash_state_sent = True
+            self.hash_state_requested = False
             
     def get_hash_state(self):
         self.send_immediately("$#")
