@@ -938,7 +938,7 @@ class Gerbil:
                     self.logger.debug(f"Received gcode parser state line: {line}")
                     
                     self._update_gcode_parser_state(line)
-                    self.gcode_parser_state_requested = False
+                    self._gps_query_sent = False
                     self._callback("on_read_gps", line)
                 
                 elif line == "[MSG:Caution: Unlocked]":
@@ -1229,6 +1229,7 @@ class Gerbil:
     def _get_gcode_parser_state(self):
         self._iface.write("$G\n")
         self._gps_query_sent = True
+        self.gcode_parser_state_requested = False
         
     def get_gcode_parser_state(self):
         self.send_immediately("$G")
@@ -1243,7 +1244,8 @@ class Gerbil:
             self.logger.debug("_get_hash_state(): Requesting hash state")
             self._iface.write("$#\n")
             self._hash_state_sent = True
-            self.hash_state_requested = False
+        
+        self.hash_state_requested = False
             
     def get_hash_state(self):
         self.send_immediately("$#")
